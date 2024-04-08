@@ -1,0 +1,252 @@
+---
+title: "TP1_R_MES"
+author: "Mame Elhadji SARR"
+date: "2024-04-05"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+1.2 Importation et mise en forme 
+
+```{r}
+#Importation de la base 
+library(readxl)
+Base_Projet <- read_excel("Base_Projet.xlsx")
+View(Base_Projet)
+projet<-Base_Projet
+```
+
+```{r}
+#Donner le nombre de lignes (i.e. le nombre de PME) et 
+nrow(projet)
+#Donner le nombre de colonnes (i.e. nombre de variables) de la base
+ncol(projet)
+
+```
+Le nombre de PME est 250 et le nombre de variable 33
+
+```{r}
+#Vérifier s’il y a des valeurs manquantes pour la variable key dans la base projet
+is.na(projet$key)
+```
+Le mot FALSE indique qu'il y a aucune valeur manquante pour la variable key se trouvant dans la base Projet
+
+1.3	Création de variables 
+
+```{r}
+#Rénommer la variable q1 en region
+names(projet)[names(projet) == "q1"] <- "region"
+#Rénommer la variable q2 en departement
+names(projet)[names(projet) == "q2"] <- "département"
+#Rénommer la variable q23 en sexe
+names(projet)[names(projet) == "q23"] <- "sexe"
+#Créer la variable sexe_2 qui vaut 1 si sexe égale à Femme et 0 sinon.
+projet$sexe_2 <- ifelse(projet$sexe == "Femme", 1, 0)
+
+```
+
+```{r}
+#création de la data frame langues
+variables_langues <- grep("^q24a_", names(projet), value = TRUE)
+langues <- projet %>%
+select(key, all_of(variables_langues))
+```
+
+
+
+```{r}
+#Créer une variable parle qui est égale au nombre de langue parlée par le dirigeant de la PME.
+langues <- langues %>%
+  mutate(parle = rowSums(.[variables_langues]))
+```
+
+
+```{r}
+#Sélectionnez uniquement les variables key et parle, l’objet de retour sera langues
+langues <- langues %>%
+  select(key, parle)
+```
+
+
+```{r}
+#Merger les data.frame projet et langues:
+projet <- projet %>%
+  left_join(langues, by = "key")
+```
+
+2	Analyses descriptives 
+
+```{r}
+# Charger les packages nécessaires 
+library(dplyr)
+library(gtsummary)
+library(lubridate)
+library(ggplot2)
+
+```
+
+```{r}
+#Labels
+projet <- projet %>%
+rename(niveau_instruction= q25,
+proprietaire_locataire = q81,
+statut_juridique = q12)
+#Répartitiion des PME
+Statisitiques_des_variables<-projet %>% tbl_summary(include =c(sexe,niveau_instruction,proprietaire_locataire,statut_juridique),
+missing_text=("valeurs manquantes")
+    )
+Statisitiques_des_variables
+```
+```{r}
+#Répartition des PME selon le statut juridique et le sexe?
+tableau_repartition_statut_sexe <- projet %>%
+  tbl_cross(
+    row =statut_juridique,
+    col = sexe,
+    percent = "row"
+  )%>%
+  add_p(source_note=TRUE)
+tableau_repartition_statut_sexe
+
+
+```
+```{r}
+#Visualisation
+graphique1<- ggplot(projet, aes(x = sexe, fill = statut_juridique)) +
+  geom_bar(position = "fill") +
+  labs(title = "Répartition du statut juridique par sexe") +
+  theme_minimal()
+graphique1
+```
+
+
+```{r}
+#Répartition des PME selon le niveau d’instruction et le sexe ?
+tableau_repartition_niveau_sexe <- projet %>%
+  tbl_cross(
+    row =niveau_instruction,
+    col = sexe,
+    percent = "row"
+  )%>%
+  add_p(source_note=TRUE)
+tableau_repartition_niveau_sexe
+```
+```{r}
+# Visualisation
+graphique2 <- ggplot(projet, aes(x = sexe, fill = niveau_instruction)) +
+  geom_bar(position = "fill") +
+  labs(title = "Répartition du niveau d'instruction par sexe") +
+  theme_minimal()
+graphique2
+
+```
+
+
+
+
+```{r}
+#Répartition des PME selon Propriétaire/locataire suivant le sexe?
+tableau_repartition_proprietaire_sexe <- projet %>%
+  tbl_cross(
+    row =proprietaire_locataire,
+    col = sexe,
+    percent = "row"
+  )%>%
+  add_p(source_note=TRUE)
+tableau_repartition_proprietaire_sexe
+```
+
+
+```{r}
+#Visualisation
+graphique3 <- ggplot(projet, aes(x = sexe, fill = proprietaire_locataire)) +
+  geom_bar(position = "fill") +
+  labs(title = "Répartition du proprietaire_locataire par sexe") +
+  theme_minimal()
+graphique3
+```
+
+
+Faite les statistiques descriptives de votre choix sur les autres variables
+création de fonction univariée
+```{r}
+#Fonction univariée
+#Nommer les filières d'abord
+projet <- projet %>%
+  rename("Arachide" = filiere_1,
+         "Anacarde" = filiere_2,
+         "Mangue" = filiere_3,
+         "Riz" = filiere_4)
+library(gtsummary)
+library(dplyr)
+t1<-subset(projet,Arachide==1)%>%
+dplyr:: select(sexe,niveau_instruction,statut_juridique,proprietaire_locataire,Arachide) %>%
+  gtsummary::tbl_summary(
+    by=Arachide,
+    statistic = list(
+      all_categorical()~ "{n}/{N} ({p}%)"
+    ),
+    missing = "no",
+    percent = "column"
+    ) %>%
+  modify_header(label ~ "**variable**") %>%
+  bold_labels()
+t1
+
+t2<-subset(projet,Anacarde==1)%>%
+  dplyr:: select(sexe,niveau_instruction,statut_juridique,proprietaire_locataire,Anacarde) %>%
+  gtsummary::tbl_summary(
+    by=Anacarde,
+    statistic = list(
+      all_categorical()~ "{n}/{N} ({p}%)"
+    ),
+    missing = "no",
+    percent = "column"
+  ) %>%
+  modify_header(label ~ "**variable**") %>%
+  bold_labels()
+t2
+
+t3<-subset(projet,Mangue==1)%>%
+  dplyr:: select(sexe,niveau_instruction,statut_juridique,proprietaire_locataire
+                 ,Mangue) %>%
+  gtsummary::tbl_summary(
+    by=Mangue,
+    statistic = list(
+      all_categorical()~ "{n}/{N} ({p}%)"
+    ),
+    missing = "no",
+    percent = "column"
+  ) %>%
+  modify_header(label ~ "**variable**") %>%
+  bold_labels()
+t3
+
+t4<-subset(projet,Riz==1)%>%
+  dplyr:: select(sexe,niveau_instruction,statut_juridique,proprietaire_locataire
+                 ,Riz) %>%
+  gtsummary::tbl_summary(
+    by=Riz,
+    statistic = list(
+      all_categorical()~ "{n}/{N} ({p}%)"
+    ),
+    missing = "no",
+    percent = "column"
+  ) %>%
+  modify_header(label ~ "**variable**") %>%
+  bold_labels()
+t4
+gtsummary:: tbl_merge(list(t1,t2,t3,t4),
+                      tab_spanner = c("Arachide","Anacarde","Mangue","Riz"))
+```
+
+
+
+
+
